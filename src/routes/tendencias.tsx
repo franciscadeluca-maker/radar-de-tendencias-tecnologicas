@@ -16,8 +16,8 @@ import { trendsQuery } from "@/services/queries";
 import { CATEGORIES, TIME_HORIZONS, type TimeHorizon, type TrendCategory } from "@/services/types";
 
 export const Route = createFileRoute("/tendencias")({
-  validateSearch: (search: Record<string, unknown>): { id?: string } => ({
-    id: typeof search.id === "string" ? search.id : undefined,
+  validateSearch: (search: Record<string, unknown>): { id?: string | undefined } => ({
+    id: typeof search["id"] === "string" ? search["id"] : undefined,
   }),
   head: () => ({
     meta: [

@@ -24,7 +24,7 @@ import type { AgentExecutionLog, AgentStatus, SearchResult, TimelinePoint, Trend
 
 export type * from "./types";
 
-const BASE_URL = (import.meta.env.VITE_N8N_WEBHOOK_BASE_URL as string | undefined)?.replace(/\/$/, "");
+const BASE_URL = (import.meta.env["VITE_N8N_WEBHOOK_BASE_URL"] as string | undefined)?.replace(/\/$/, "");
 
 export const isLiveMode = () => Boolean(BASE_URL);
 
@@ -71,7 +71,7 @@ export async function triggerSearch(query?: string): Promise<SearchResult> {
   }
   const startedAt = new Date();
   await wait(2500);
-  const seed = MOCK_DISCOVERABLE[discoverIndex % MOCK_DISCOVERABLE.length];
+  const seed = MOCK_DISCOVERABLE[discoverIndex % MOCK_DISCOVERABLE.length]!;
   discoverIndex += 1;
   const stamp = startedAt.getTime().toString(36);
   const trend: Trend = { ...seed, id: `tr-${stamp}`, detectedAt: new Date().toISOString() };

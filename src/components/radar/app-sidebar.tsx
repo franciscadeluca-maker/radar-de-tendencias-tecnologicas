@@ -59,8 +59,8 @@ export function AppSidebar() {
               {NAV.map((item) => {
                 const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
                 return (
+                  <SidebarMenuItem key={item.to}>
                   <SidebarMenuButton
-                    key={item.to}
                     asChild
                     isActive={active}
                     tooltip={item.title}
@@ -71,6 +71,7 @@ export function AppSidebar() {
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
+                  </SidebarMenuItem>
                 );
               })}
             </SidebarMenu>

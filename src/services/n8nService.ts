@@ -266,3 +266,63 @@ export async function getTimeline(): Promise<TimelinePoint[]> {
     "IA y Automatización": 0,
     "Energía Solar": 0,
     "Movilidad Eléctrica": 0,
+    Regulación: 0,
+  });
+
+  trends.forEach((t) => {
+    const month = t.detectedAt.slice(0, 7); // "YYYY-MM"
+    if (!monthMap.has(month)) {
+      monthMap.set(month, emptyCounts());
+    }
+    const record = monthMap.get(month)!;
+    record[t.category] = (record[t.category] ?? 0) + 1;
+  });
+
+  return Array.from(monthMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([month, values]) => ({ month, values }));
+}
+
+export async function getAgentStatus(): Promise<AgentStatus> {
+  return {
+    ...MOCK_AGENT_STATUS,
+    state: "Activo",
+    schedule: "Todos los días · 14:00",
+  };
+}
+
+let discoverIndex = 0;
+
+/** Solicita al agente una nueva búsqueda (conecta a webhook POST si existe, o simula en interfaz). */
+export async function triggerSearch(query?: string): Promise<SearchResult> {
+  if (BASE_URL) {
+    const res = await fetch(`${BASE_URL}/buscar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+    if (!res.ok) {
+      throw new Error(`El agente respondió ${res.status}`);
+    }
+    cachedTrends = null; // Fuerza recarga del Sheet
+    return res.json() as Promise<SearchResult>;
+  }
+
+  const startedAt = new Date();
+  await wait(2500);
+  const seed = MOCK_DISCOVERABLE[discoverIndex % MOCK_DISCOVERABLE.length]!;
+  discoverIndex += 1;
+  const stamp = startedAt.getTime().toString(36);
+  const trend: Trend = { ...seed, id: `tr-${stamp}`, detectedAt: new Date().toISOString() };
+  const log: AgentExecutionLog = {
+    id: `ex-${stamp}`,
+    startedAt: startedAt.toISOString(),
+    status: "Completado",
+    sourcesScanned: 46,
+    newTrends: 1,
+    durationSeconds: 3,
+    trigger: "Manual",
+    model: "Gemini 2.5 Pro",
+  };
+  return { trend, log };
+}

@@ -28,3 +28,10 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Project rules
+
+- All n8n access goes through `src/services/n8nService.ts` (typed by `src/services/types.ts`); it returns mocks from `mockData.ts` unless `VITE_N8N_WEBHOOK_BASE_URL` is set — keeps the swap to real webhooks a one-file change.
+- Pages read data via TanStack Query options in `src/services/queries.ts`; agent actions update that cache (see `src/hooks/use-agent.ts`) so new trends/logs appear app-wide without a backend.
+- Pure aggregation/filter logic lives in `src/lib/radar/stats.ts` so it can be unit-tested apart from UI.
+- Dates render in Buenos Aires time via `src/lib/radar/format.ts` to avoid server/browser hydration mismatches.

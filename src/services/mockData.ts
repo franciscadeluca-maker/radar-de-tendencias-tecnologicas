@@ -131,12 +131,12 @@ export const MOCK_TRENDS: Trend[] = [
   },
   {
     id: "tr-001",
-    title: "Fusión nuclear compacta con imanes superconductores",
-    summary: "Startups de fusión reportan avances en imanes superconductores de alta temperatura; aunque la generación comercial sigue lejana, la inversión privada se acelera.",
-    insights: ["Más de 7.000 millones de USD de inversión privada acumulada.", "Primeras plantas demostrativas previstas para la década de 2030."],
-    category: "Almacenamiento Energético", timeHorizon: "Largo Plazo", relevanceScore: 58,
-    detectedAt: "2025-12-16T13:15:00Z", sourceName: "Science", sourceUrl: "https://www.science.org/",
-    keywords: ["fusión", "HTS", "superconductores"],
+    title: "Supergrids HVDC entre países",
+    summary: "Proyectos de transmisión en corriente continua de alta tensión conectan mercados eléctricos de distintos países, permitiendo compartir excedentes renovables a grandes distancias.",
+    insights: ["Interconexiones submarinas de más de 1.000 km en desarrollo.", "Desafíos de gobernanza y reparto de costos entre países."],
+    category: "Redes Inteligentes", timeHorizon: "Largo Plazo", relevanceScore: 58,
+    detectedAt: "2025-12-16T13:15:00Z", sourceName: "IEEE Spectrum", sourceUrl: "https://spectrum.ieee.org/topic/energy/",
+    keywords: ["HVDC", "interconexión", "transmisión"],
   },
 ];
 

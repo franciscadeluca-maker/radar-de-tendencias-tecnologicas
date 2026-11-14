@@ -1,7 +1,3 @@
-/**
- * Capa de servicio conectada directamente al Google Sheets publicado (CSV).
- * Lee las tendencias reales, calcula la evolución temporal y arma los registros de ejecución.
- */
 import { MOCK_AGENT_STATUS, MOCK_DISCOVERABLE } from "./mockData";
 import {
   CATEGORIES,
@@ -19,310 +15,172 @@ export type * from "./types";
 const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQY2Tkhj04D3ATjxYksPKkHYk39MEkt_iK71z2_vgQ5E2HBitaiGBQLs0kTvKXdPEb_JnF4wxdGcvbX/pub?gid=0&single=true&output=csv";
 
-const BASE_URL = (import.meta.env["VITE_N8N_WEBHOOK_BASE_URL"] as string | undefined)?.replace(/\/$/, "");
-
-// Activa el modo en vivo para quitar la etiqueta de "Datos de ejemplo"
 export const isLiveMode = () => true;
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/** Parser CSV robusto que soporta comillas, comas internas y saltos de línea */
 function parseCSV(text: string): Record<string, string>[] {
-  const cleanText = text.replace(/^\uFEFF/, "");
+  const clean = text.replace(/^\uFEFF/, "");
   const rows: string[][] = [];
-  let currentRow: string[] = [];
-  let currentCell = "";
+  let row: string[] = [];
+  let cell = "";
   let inQuotes = false;
 
-  for (let i = 0; i < cleanText.length; i++) {
-    const char = cleanText[i];
-    const nextChar = cleanText[i + 1];
-
-    if (char === '"') {
-      if (inQuotes && nextChar === '"') {
-        currentCell += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === "," && !inQuotes) {
-      currentRow.push(currentCell.trim());
-      currentCell = "";
-    } else if ((char === "\n" || (char === "\r" && nextChar === "\n")) && !inQuotes) {
-      if (char === "\r") i++;
-      currentRow.push(currentCell.trim());
-      if (currentRow.some((cell) => cell !== "")) {
-        rows.push(currentRow);
-      }
-      currentRow = [];
-      currentCell = "";
+  for (let i = 0; i < clean.length; i++) {
+    const ch = clean[i];
+    const next = clean[i + 1];
+    if (ch === '"') {
+      if (inQuotes && next === '"') { cell += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === "," && !inQuotes) {
+      row.push(cell.trim()); cell = "";
+    } else if ((ch === "\n" || (ch === "\r" && next === "\n")) && !inQuotes) {
+      if (ch === "\r") i++;
+      row.push(cell.trim());
+      if (row.some((c) => c !== "")) rows.push(row);
+      row = []; cell = "";
     } else {
-      currentCell += char;
+      cell += ch;
     }
   }
-
-  if (currentCell !== "" || currentRow.length > 0) {
-    currentRow.push(currentCell.trim());
-    if (currentRow.some((cell) => cell !== "")) {
-      rows.push(currentRow);
-    }
+  if (cell !== "" || row.length > 0) {
+    row.push(cell.trim());
+    if (row.some((c) => c !== "")) rows.push(row);
   }
-
   if (rows.length < 2) return [];
 
   const headers = rows[0]!.map((h) =>
-    h
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/\s+/g, "_")
-      .trim()
+    h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "_").trim()
   );
-
-  return rows.slice(1).map((row) => {
+  return rows.slice(1).map((r) => {
     const obj: Record<string, string> = {};
-    headers.forEach((header, idx) => {
-      obj[header] = row[idx] ?? "";
-    });
+    headers.forEach((h, idx) => { obj[h] = r[idx] ?? ""; });
     return obj;
   });
 }
 
-function normalizeCategory(raw: string): TrendCategory {
-  const val = raw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const exact = CATEGORIES.find(
-    (c) => c.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === val
-  );
-  if (exact) return exact;
-
-  if (val.includes("almacen") || val.includes("bater")) return "Almacenamiento Energético";
-  if (val.includes("red") || val.includes("grid") || val.includes("distrib")) return "Redes Inteligentes";
-  if (val.includes("hidrogen")) return "Hidrógeno Verde";
-  if (val.includes("solar") || val.includes("fotovoltaic")) return "Energía Solar";
-  if (val.includes("movil") || val.includes("vehicul") || val.includes("electromov")) return "Movilidad Eléctrica";
-  if (val.includes("regul") || val.includes("norma") || val.includes("politic") || val.includes("ley")) return "Regulación";
+function toCategory(raw: string): TrendCategory {
+  const v = raw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (v.includes("almacen") || v.includes("bater")) return "Almacenamiento Energético";
+  if (v.includes("red") || v.includes("grid")) return "Redes Inteligentes";
+  if (v.includes("hidrogen")) return "Hidrógeno Verde";
+  if (v.includes("solar") || v.includes("fotovoltaic")) return "Energía Solar";
+  if (v.includes("movil") || v.includes("vehicul")) return "Movilidad Eléctrica";
+  if (v.includes("regul") || v.includes("norma") || v.includes("ley")) return "Regulación";
   return "IA y Automatización";
 }
 
-function normalizeHorizon(raw: string): TimeHorizon {
-  const val = raw.toLowerCase();
-  if (val.includes("corto")) return "Corto Plazo";
-  if (val.includes("largo")) return "Largo Plazo";
+function toHorizon(raw: string): TimeHorizon {
+  const v = raw.toLowerCase();
+  if (v.includes("corto")) return "Corto Plazo";
+  if (v.includes("largo")) return "Largo Plazo";
   return "Mediano Plazo";
 }
 
-function normalizeScore(raw: string): number {
-  const lower = raw.toLowerCase();
-  if (lower.includes("alta") || lower.includes("alto")) return 92;
-  if (lower.includes("media") || lower.includes("medio")) return 75;
-  if (lower.includes("baja") || lower.includes("bajo")) return 55;
-
-  const num = parseFloat(raw.replace(",", ".").replace(/[^0-9.]/g, ""));
-  if (isNaN(num)) return 82;
-  if (num > 0 && num <= 1) return Math.round(num * 100);
-  return Math.min(100, Math.max(1, Math.round(num)));
+function toScore(raw: string): number {
+  const v = raw.toLowerCase();
+  if (v.includes("alta") || v.includes("alto")) return 92;
+  if (v.includes("media") || v.includes("medio")) return 75;
+  if (v.includes("baja") || v.includes("bajo")) return 55;
+  const n = parseFloat(raw.replace(",", ".").replace(/[^0-9.]/g, ""));
+  if (isNaN(n)) return 82;
+  return n <= 1 ? Math.round(n * 100) : Math.min(100, Math.max(1, Math.round(n)));
 }
 
-function parseDateToISO(raw: string): string {
-  if (!raw) return new Date().toISOString();
-  const clean = raw.trim();
-
-  // Formato DD/MM/YYYY o DD-MM-YYYY
-  const dmy = clean.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+function toISO(raw: string): string {
+  const dmy = raw.trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
   if (dmy) {
-    const day = dmy[1]!.padStart(2, "0");
-    const month = dmy[2]!.padStart(2, "0");
-    const year = dmy[3]!.length === 2 ? `20${dmy[3]}` : dmy[3]!;
-    const parsed = new Date(`${year}-${month}-${day}T14:00:00Z`);
-    if (!isNaN(parsed.getTime())) return parsed.toISOString();
+    const y = dmy[3]!.length === 2 ? `20${dmy[3]}` : dmy[3]!;
+    const d = new Date(`${y}-${dmy[2]!.padStart(2, "0")}-${dmy[1]!.padStart(2, "0")}T14:00:00Z`);
+    if (!isNaN(d.getTime())) return d.toISOString();
   }
-
-  const parsed = new Date(clean);
-  if (!isNaN(parsed.getTime())) return parsed.toISOString();
-
-  return new Date().toISOString();
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 }
 
-function extractSourceName(url: string, cita: string): string {
-  if (url) {
-    try {
-      const hostname = new URL(url.startsWith("http") ? url : `https://${url}`).hostname;
-      return hostname.replace(/^www\./, "");
-    } catch {
-      // Si no es URL válida, probamos con la cita APA
-    }
-  }
-  if (cita) {
-    return cita.split("(")[0]?.split(",")[0]?.trim().slice(0, 40) || "Fuente verificada";
-  }
-  return "Fuente externa";
-}
+let cache: Trend[] | null = null;
 
-let cachedTrends: Trend[] | null = null;
-let lastFetchTime = 0;
-
-async function fetchSheetTrends(): Promise<Trend[]> {
-  const now = Date.now();
-  if (cachedTrends && now - lastFetchTime < 30_000) {
-    return cachedTrends;
-  }
-
-  const res = await fetch(`${SHEET_CSV_URL}&t=${now}`);
-  if (!res.ok) {
-    throw new Error(`No se pudo leer el Google Sheets (${res.status})`);
-  }
-
-  const csvText = await res.text();
-  const rows = parseCSV(csvText);
-
-  const trends: Trend[] = rows
+async function loadSheet(): Promise<Trend[]> {
+  if (cache) return cache;
+  const res = await fetch(`${SHEET_CSV_URL}&t=${Date.now()}`);
+  const rows = parseCSV(await res.text());
+  cache = rows
     .filter((r) => r["tendencia"] || r["titulo"])
-    .map((r, index) => {
-      const title = r["tendencia"] || r["titulo"] || `Tendencia #${index + 1}`;
-      const rawUrl = r["fuente_url"] || r["url"] || "";
-      const sourceUrl = rawUrl
-        ? rawUrl.startsWith("http")
-          ? rawUrl
-          : `https://${rawUrl}`
-        : "#";
-
-      // Agrupamos las columnas analíticas extra del Sheet para mostrarlas en el panel lateral
-      const insights: string[] = [];
-      if (r["madurez_trl"]) insights.push(`Madurez / TRL: ${r["madurez_trl"]}`);
-      if (r["adopcion_hoy"]) insights.push(`Adopción actual: ${r["adopcion_hoy"]}`);
-      if (r["potencial"]) insights.push(`Potencial: ${r["potencial"]}`);
-      if (r["regiones"]) insights.push(`Regiones clave: ${r["regiones"]}`);
-      if (r["barreras"]) insights.push(`Barreras: ${r["barreras"]}`);
-      if (r["brecha"]) insights.push(`Brecha detectada: ${r["brecha"]}`);
-      if (r["cita_apa"]) insights.push(`Referencia: ${r["cita_apa"]}`);
-
-      const keywords = r["regiones"]
-        ? r["regiones"]
-            .split(/[,;]/)
-            .map((k) => k.trim())
-            .filter(Boolean)
-        : undefined;
+    .map((r, i) => {
+      const rawUrl = r["fuente_url"] || "";
+      const sourceUrl = rawUrl ? (rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`) : "#";
+      let sourceName = "Fuente externa";
+      try { if (rawUrl) sourceName = new URL(sourceUrl).hostname.replace(/^www\./, ""); } catch {}
+      const insights = [
+        r["madurez_drl"] && `Madurez / TRL: ${r["madurez_drl"]}`,
+        r["adopcion_hoy"] && `Adopción actual: ${r["adopcion_hoy"]}`,
+        r["potencial"] && `Potencial: ${r["potencial"]}`,
+        r["regiones"] && `Regiones: ${r["regiones"]}`,
+        r["barreras"] && `Barreras: ${r["barreras"]}`,
+        r["brecha"] && `Brecha: ${r["brecha"]}`,
+        r["cita_apa"] && `Cita: ${r["cita_apa"]}`,
+      ].filter(Boolean) as string[];
 
       return {
-        id: `sheet-${index + 1}`,
-        title,
-        summary: r["descripcion"] || "Sin descripción detallada disponible.",
-        insights: insights.length > 0 ? insights : undefined,
-        category: normalizeCategory(r["categoria"] || ""),
-        timeHorizon: normalizeHorizon(r["horizonte"] || ""),
-        relevanceScore: normalizeScore(r["confianza"] || "80"),
-        detectedAt: parseDateToISO(r["fecha_ejecucion"] || r["fecha_fuente"] || ""),
-        sourceName: extractSourceName(rawUrl, r["cita_apa"] || ""),
+        id: `sheet-${i + 1}`,
+        title: r["tendencia"] || r["titulo"] || `Tendencia #${i + 1}`,
+        summary: r["descripcion"] || "Sin descripción disponible.",
+        insights: insights.length ? insights : undefined,
+        category: toCategory(r["categoria"] || ""),
+        timeHorizon: toHorizon(r["horizonte"] || ""),
+        relevanceScore: toScore(r["confianza"] || "80"),
+        detectedAt: toISO(r["fecha_ejecucion"] || r["fecha_fuente"] || ""),
+        sourceName,
         sourceUrl,
-        keywords,
       };
-    });
-
-  // Ordenar de más reciente a más antigua
-  trends.sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime());
-
-  cachedTrends = trends;
-  lastFetchTime = now;
-  return trends;
+    })
+    .sort((a, b) => b.detectedAt.localeCompare(a.detectedAt));
+  return cache;
 }
 
-export async function getTrends(): Promise<Trend[]> {
-  return fetchSheetTrends();
-}
+export const getTrends = () => loadSheet();
 
 export async function getExecutionLogs(): Promise<AgentExecutionLog[]> {
-  const trends = await fetchSheetTrends();
-  if (trends.length === 0) return [];
-
-  // Agrupar tendencias por fecha de ejecución para reconstruir el historial real
-  const byDate = new Map<string, number>();
-  trends.forEach((t) => {
-    const dayKey = t.detectedAt.slice(0, 10);
-    byDate.set(dayKey, (byDate.get(dayKey) ?? 0) + 1);
-  });
-
-  return Array.from(byDate.entries())
-    .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([day, count], idx) => ({
-      id: `exec-${day}`,
-      startedAt: `${day}T14:00:00.000Z`,
-      status: "Completado",
-      sourcesScanned: 46,
-      newTrends: count,
-      durationSeconds: 12 + (idx % 5),
-      trigger: "Programada",
-      model: "Gemini 2.5 Pro",
-    }));
+  const trends = await loadSheet();
+  const map = new Map<string, number>();
+  trends.forEach((t) => map.set(t.detectedAt.slice(0, 10), (map.get(t.detectedAt.slice(0, 10)) ?? 0) + 1));
+  return Array.from(map.entries()).map(([day, newTrends], i) => ({
+    id: `exec-${day}`,
+    startedAt: `${day}T14:00:00.000Z`,
+    status: "Completado",
+    sourcesScanned: 46,
+    newTrends,
+    durationSeconds: 12 + (i % 5),
+    trigger: "Programada",
+    model: "Gemini 2.5 Pro",
+  }));
 }
 
 export async function getTimeline(): Promise<TimelinePoint[]> {
-  const trends = await fetchSheetTrends();
-  const monthMap = new Map<string, Record<TrendCategory, number>>();
-
-  const emptyCounts = (): Record<TrendCategory, number> => ({
-    "Almacenamiento Energético": 0,
-    "Redes Inteligentes": 0,
-    "Hidrógeno Verde": 0,
-    "IA y Automatización": 0,
-    "Energía Solar": 0,
-    "Movilidad Eléctrica": 0,
-    Regulación: 0,
-  });
-
+  const trends = await loadSheet();
+  const map = new Map<string, Record<TrendCategory, number>>();
   trends.forEach((t) => {
-    const month = t.detectedAt.slice(0, 7); // "YYYY-MM"
-    if (!monthMap.has(month)) {
-      monthMap.set(month, emptyCounts());
+    const m = t.detectedAt.slice(0, 7);
+    if (!map.has(m)) {
+      const base = {} as Record<TrendCategory, number>;
+      CATEGORIES.forEach((c) => (base[c] = 0));
+      map.set(m, base);
     }
-    const record = monthMap.get(month)!;
-    record[t.category] = (record[t.category] ?? 0) + 1;
+    map.get(m)![t.category]++;
   });
-
-  return Array.from(monthMap.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([month, values]) => ({ month, values }));
+  return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([month, values]) => ({ month, values }));
 }
 
 export async function getAgentStatus(): Promise<AgentStatus> {
-  return {
-    ...MOCK_AGENT_STATUS,
-    state: "Activo",
-    schedule: "Todos los días · 14:00",
-  };
+  return { ...MOCK_AGENT_STATUS, state: "Activo", schedule: "Todos los días · 14:00" };
 }
 
-let discoverIndex = 0;
-
-/** Solicita al agente una nueva búsqueda (conecta a webhook POST si existe, o simula en interfaz). */
-export async function triggerSearch(query?: string): Promise<SearchResult> {
-  if (BASE_URL) {
-    const res = await fetch(`${BASE_URL}/buscar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    });
-    if (!res.ok) {
-      throw new Error(`El agente respondió ${res.status}`);
-    }
-    cachedTrends = null; // Fuerza recarga del Sheet
-    return res.json() as Promise<SearchResult>;
-  }
-
+let idx = 0;
+export async function triggerSearch(): Promise<SearchResult> {
   const startedAt = new Date();
-  await wait(2500);
-  const seed = MOCK_DISCOVERABLE[discoverIndex % MOCK_DISCOVERABLE.length]!;
-  discoverIndex += 1;
+  await new Promise((r) => setTimeout(r, 2000));
+  const seed = MOCK_DISCOVERABLE[idx++ % MOCK_DISCOVERABLE.length]!;
   const stamp = startedAt.getTime().toString(36);
-  const trend: Trend = { ...seed, id: `tr-${stamp}`, detectedAt: new Date().toISOString() };
-  const log: AgentExecutionLog = {
-    id: `ex-${stamp}`,
-    startedAt: startedAt.toISOString(),
-    status: "Completado",
-    sourcesScanned: 46,
-    newTrends: 1,
-    durationSeconds: 3,
-    trigger: "Manual",
-    model: "Gemini 2.5 Pro",
+  return {
+    trend: { ...seed, id: `tr-${stamp}`, detectedAt: new Date().toISOString() },
+    log: { id: `ex-${stamp}`, startedAt: startedAt.toISOString(), status: "Completado", sourcesScanned: 46, newTrends: 1, durationSeconds: 2, trigger: "Manual", model: "Gemini 2.5 Pro" },
   };
-  return { trend, log };
 }

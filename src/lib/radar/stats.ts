@@ -88,7 +88,9 @@ export function timelineFromMonth(timeline: TimelinePoint[], startMonth: string)
 /** Variación porcentual entre el último mes y el anterior de la serie. */
 export function monthlyChange(timeline: TimelinePoint[]) {
   if (timeline.length < 2) return [] as { category: TrendCategory; current: number; change: number }[];
-  const [prev, last] = timeline.slice(-2);
+  const prev = timeline[timeline.length - 2];
+  const last = timeline[timeline.length - 1];
+  if (!prev || !last) return [];
   return CATEGORIES.map((category) => {
     const a = prev.values[category] ?? 0;
     const b = last.values[category] ?? 0;

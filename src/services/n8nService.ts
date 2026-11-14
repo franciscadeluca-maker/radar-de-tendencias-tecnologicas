@@ -188,7 +188,7 @@ async function fetchSheetTrends(): Promise<Trend[]> {
 
       // Agrupamos las columnas analíticas extra del Sheet para mostrarlas en el panel lateral
       const insights: string[] = [];
-      if (r["madurez_drl"]) insights.push(`Madurez / TRL: ${r["madurez_drl"]}`);
+      if (r["madurez_trl"]) insights.push(`Madurez / TRL: ${r["madurez_trl"]}`);
       if (r["adopcion_hoy"]) insights.push(`Adopción actual: ${r["adopcion_hoy"]}`);
       if (r["potencial"]) insights.push(`Potencial: ${r["potencial"]}`);
       if (r["regiones"]) insights.push(`Regiones clave: ${r["regiones"]}`);

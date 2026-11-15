@@ -55,6 +55,7 @@ function Dashboard() {
   const horizons = horizonBreakdown(trends);
   const recent = [...trends].sort((a, b) => b.detectedAt.localeCompare(a.detectedAt)).slice(0, 5);
   const weekDelta = weekly.length - previousWeek;
+  const maxHorizon = Math.max(1, ...horizons.map((h) => h.total));
 
   const pieConfig = Object.fromEntries(byCategory.map((c) => [c.category, { label: c.category, color: CATEGORY_COLOR[c.category] }])) satisfies ChartConfig;
 
@@ -123,7 +124,7 @@ function Dashboard() {
               </div>
             </div>
 
-            <ul className="grid grid-cols-1 gap-1.5 xl:grid-cols-2 xl:gap-x-6">
+            <ul className="grid w-full max-w-2xl grid-cols-1 gap-1.5">
               {byCategory.map((c) => (
                 <li key={c.category}>
                   <Link
@@ -181,7 +182,7 @@ function Dashboard() {
                           <div
                             key={c.category}
                             className="h-full border-r border-card last:border-r-0"
-                            style={{ width: `${(c.total / total) * 100}%`, background: CATEGORY_COLOR[c.category] }}
+                            style={{ width: `${(c.total / maxHorizon) * 100}%`, background: CATEGORY_COLOR[c.category] }}
                             title={`${c.category}: ${c.total}`}
                           />
                         ))

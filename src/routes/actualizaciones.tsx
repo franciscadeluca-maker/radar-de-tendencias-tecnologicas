@@ -3,7 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { CalendarClock, Clock, Cpu, Database, Loader2, Play, Timer, Webhook } from "lucide-react";
 import { useState } from "react";
 
-import mascota from "@/assets/energvision-mascota.png.png.asset.json";
+
 import { StatusBadge } from "@/components/radar/badges";
 import { KpiCard } from "@/components/radar/kpi-card";
 import { PageHeader, Panel } from "@/components/radar/page-header";

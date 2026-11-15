@@ -3,7 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { CalendarClock, Clock, Cpu, Database, Loader2, Play, Timer, Webhook } from "lucide-react";
 import { useState } from "react";
 
-<img src="/mascota-energvision.png" alt="Mascota del agente EnergVision" className="relative size-28 object-contain" />
+import mascota from "@/assets/energvision-mascota.png.asset.json";
 import { StatusBadge } from "@/components/radar/badges";
 import { KpiCard } from "@/components/radar/kpi-card";
 import { PageHeader, Panel } from "@/components/radar/page-header";
@@ -56,7 +56,7 @@ function Updates() {
             <div className="relative hidden size-28 shrink-0 sm:block">
               <div className="absolute inset-2 rounded-full bg-sky-soft" />
               {busy && <div className="absolute inset-0 rounded-full border-2 border-dashed border-sky animate-radar" />}
-              <img src={mascota.url} alt="Mascota del agente EnergVision" className="relative size-28 object-contain" />
+              <img src="/mascota-energvision.png" alt="Mascota del agente EnergVision" className="relative size-28 object-contain" />
             </div>
             <div className="min-w-0 space-y-3">
               <div className="flex flex-wrap items-center gap-2">

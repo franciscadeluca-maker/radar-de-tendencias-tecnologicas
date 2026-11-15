@@ -1,13 +1,25 @@
-import {
-  CATEGORIES,
-  TIME_HORIZONS,
-  type TimeHorizon,
-  type TimelinePoint,
-  type Trend,
-  type TrendCategory,
-} from "@/services/types";
+import { CATEGORIES, TIME_HORIZONS, type TimeHorizon, type Trend, type TrendCategory } from "@/services/types";
 
 const DAY = 86_400_000;
+
+/**
+ * Porcentajes enteros que siempre suman 100 (método del mayor resto),
+ * para que la leyenda nunca muestre 99 % o 101 %.
+ */
+export function percentages(counts: number[]) {
+  const total = counts.reduce((a, b) => a + b, 0);
+  if (!total) return counts.map(() => 0);
+  const raw = counts.map((c) => (c / total) * 100);
+  const floors = raw.map(Math.floor);
+  let left = 100 - floors.reduce((a, b) => a + b, 0);
+  const order = raw.map((r, i) => ({ i, rest: r - Math.floor(r) })).sort((a, b) => b.rest - a.rest);
+  for (const { i } of order) {
+    if (left <= 0) break;
+    floors[i]! += 1;
+    left--;
+  }
+  return floors;
+}
 
 export function countByCategory(trends: Trend[]) {
   return CATEGORIES.map((category) => ({
@@ -16,24 +28,30 @@ export function countByCategory(trends: Trend[]) {
   })).sort((a, b) => b.total - a.total);
 }
 
-export function countByHorizon(trends: Trend[]) {
-  return TIME_HORIZONS.map((horizon) => {
-    const items = trends.filter((t) => t.timeHorizon === horizon);
+/** Distribución por categoría (solo categorías con tendencias), con porcentaje sobre el total. */
+export function categoryDistribution(trends: Trend[]) {
+  const rows = countByCategory(trends).filter((c) => c.total > 0);
+  const pcts = percentages(rows.map((r) => r.total));
+  return rows.map((r, i) => ({ ...r, pct: pcts[i] ?? 0 }));
+}
+
+/** Tendencias por horizonte temporal, desglosadas por categoría. */
+export function horizonBreakdown(trends: Trend[]) {
+  const totals = TIME_HORIZONS.map((h) => trends.filter((t) => t.timeHorizon === h));
+  const pcts = percentages(totals.map((items) => items.length));
+  return TIME_HORIZONS.map((horizon, i) => {
+    const items = totals[i] ?? [];
     return {
       horizon,
       total: items.length,
-      avgRelevance: items.length ? Math.round(items.reduce((s, t) => s + t.relevanceScore, 0) / items.length) : 0,
+      pct: pcts[i] ?? 0,
+      avgRelevance: avgRelevance(items),
+      byCategory: CATEGORIES.map((category) => ({
+        category,
+        total: items.filter((t) => t.category === category).length,
+      })).filter((c) => c.total > 0),
     };
   });
-}
-
-export function topSources(trends: Trend[], limit = 6) {
-  const map = new Map<string, number>();
-  for (const t of trends) map.set(t.sourceName, (map.get(t.sourceName) ?? 0) + 1);
-  return [...map.entries()]
-    .map(([source, total]) => ({ source, total }))
-    .sort((a, b) => b.total - a.total || a.source.localeCompare(b.source))
-    .slice(0, limit);
 }
 
 export function detectedWithin(trends: Trend[], days: number, now: Date) {
@@ -55,47 +73,10 @@ export function monthKey(iso: string) {
   return iso.slice(0, 7);
 }
 
-/** Serie del gráfico temporal: publicaciones analizadas por mes + tendencias detectadas ese mes. */
-export function detectionSeries(timeline: TimelinePoint[], trends: Trend[]) {
-  return timeline.map((p) => ({
-    month: p.month,
-    publicaciones: Object.values(p.values).reduce((a, b) => a + b, 0),
-    tendencias: trends.filter((t) => monthKey(t.detectedAt) === p.month).length,
-  }));
-}
-
-export const RANGE_OPTIONS = [
-  { value: "3m", label: "3 meses", months: 3 },
-  { value: "6m", label: "6 meses", months: 6 },
-  { value: "12m", label: "12 meses", months: 12 },
-] as const;
-export type RangeValue = (typeof RANGE_OPTIONS)[number]["value"];
-
-/** Primer mes (YYYY-MM) incluido al mirar los últimos `months` meses desde `now`. */
-export function rangeStartMonth(months: number, now: Date) {
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-export function trendsFromMonth(trends: Trend[], startMonth: string) {
-  return trends.filter((t) => monthKey(t.detectedAt) >= startMonth);
-}
-
-export function timelineFromMonth(timeline: TimelinePoint[], startMonth: string) {
-  return timeline.filter((p) => p.month >= startMonth);
-}
-
-/** Variación porcentual entre el último mes y el anterior de la serie. */
-export function monthlyChange(timeline: TimelinePoint[]) {
-  if (timeline.length < 2) return [] as { category: TrendCategory; current: number; change: number }[];
-  const prev = timeline[timeline.length - 2];
-  const last = timeline[timeline.length - 1];
-  if (!prev || !last) return [];
-  return CATEGORIES.map((category) => {
-    const a = prev.values[category] ?? 0;
-    const b = last.values[category] ?? 0;
-    return { category, current: b, change: a ? Math.round(((b - a) / a) * 1000) / 10 : 0 };
-  }).sort((x, y) => y.change - x.change);
+/** Tendencias detectadas en el mes calendario actual (UTC) de `now`. */
+export function detectedThisMonth(trends: Trend[], now: Date) {
+  const key = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  return trends.filter((t) => monthKey(t.detectedAt) === key);
 }
 
 export type SortField = "title" | "category" | "timeHorizon" | "detectedAt" | "sourceName" | "relevanceScore";
@@ -136,4 +117,16 @@ export function sortTrends(trends: Trend[], field: SortField, dir: SortDir) {
         return a[field].localeCompare(b[field], "es") * m;
     }
   });
+}
+
+/** Lee los filtros del Explorador desde la URL, ignorando valores desconocidos. */
+export function parseExplorerSearch(search: Record<string, unknown>) {
+  const id = search["id"];
+  const cat = search["categoria"];
+  const hor = search["horizonte"];
+  return {
+    id: typeof id === "string" ? id : undefined,
+    categoria: (CATEGORIES as readonly unknown[]).includes(cat) ? (cat as TrendCategory) : undefined,
+    horizonte: (TIME_HORIZONS as readonly unknown[]).includes(hor) ? (hor as TimeHorizon) : undefined,
+  };
 }

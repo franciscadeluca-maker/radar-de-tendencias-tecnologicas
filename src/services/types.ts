@@ -51,12 +51,6 @@ export interface AgentExecutionLog {
   errorMessage?: string;
 }
 
-/** Publicaciones analizadas por mes y categoría. */
-export interface TimelinePoint {
-  month: string; // "2026-01"
-  values: Record<TrendCategory, number>;
-}
-
 export interface AgentStatus {
   state: "Activo" | "En espera";
   workflowName: string;

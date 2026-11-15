@@ -10,15 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fmtDate } from "@/lib/radar/format";
-import { filterTrends, sortTrends, type SortDir, type SortField } from "@/lib/radar/stats";
+import { filterTrends, parseExplorerSearch, sortTrends, type SortDir, type SortField } from "@/lib/radar/stats";
 import { cn } from "@/lib/utils";
 import { trendsQuery } from "@/services/queries";
 import { CATEGORIES, TIME_HORIZONS, type TimeHorizon, type TrendCategory } from "@/services/types";
 
 export const Route = createFileRoute("/tendencias")({
-  validateSearch: (search: Record<string, unknown>): { id?: string | undefined } => ({
-    id: typeof search["id"] === "string" ? search["id"] : undefined,
-  }),
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { id?: string | undefined; categoria?: TrendCategory | undefined; horizonte?: TimeHorizon | undefined } =>
+    parseExplorerSearch(search),
   head: () => ({
     meta: [
       { title: "Explorador de Tendencias · EnergVision" },
@@ -44,12 +45,17 @@ const COLUMNS: { field: SortField; label: string; className?: string }[] = [
 
 function Explorer() {
   const { data: trends } = useSuspenseQuery(trendsQuery);
-  const { id } = Route.useSearch();
+  const { id, categoria, horizonte } = Route.useSearch();
   const navigate = useNavigate({ from: "/tendencias" });
 
   const [q, setQ] = useState("");
-  const [category, setCategory] = useState<TrendCategory | "todas">("todas");
-  const [horizon, setHorizon] = useState<TimeHorizon | "todos">("todos");
+  // Categoría y horizonte viven en la URL para que el Dashboard pueda abrir el Explorador ya filtrado.
+  const category: TrendCategory | "todas" = categoria ?? "todas";
+  const horizon: TimeHorizon | "todos" = horizonte ?? "todos";
+  const setCategory = (v: TrendCategory | "todas") =>
+    navigate({ search: (prev) => ({ ...prev, categoria: v === "todas" ? undefined : v }), replace: true, resetScroll: false });
+  const setHorizon = (v: TimeHorizon | "todos") =>
+    navigate({ search: (prev) => ({ ...prev, horizonte: v === "todos" ? undefined : v }), replace: true, resetScroll: false });
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir }>({ field: "detectedAt", dir: "desc" });
 
   const rows = useMemo(
@@ -59,8 +65,8 @@ function Explorer() {
   const selected = trends.find((t) => t.id === id) ?? null;
   const hasFilters = q !== "" || category !== "todas" || horizon !== "todos";
 
-  const open = (trendId: string) => navigate({ search: { id: trendId }, resetScroll: false });
-  const close = () => navigate({ search: { id: undefined }, resetScroll: false });
+  const open = (trendId: string) => navigate({ search: (prev) => ({ ...prev, id: trendId }), resetScroll: false });
+  const close = () => navigate({ search: (prev) => ({ ...prev, id: undefined }), resetScroll: false });
 
   const toggleSort = (field: SortField) =>
     setSort((s) => (s.field === field ? { field, dir: s.dir === "asc" ? "desc" : "asc" } : { field, dir: field === "title" || field === "sourceName" || field === "category" ? "asc" : "desc" }));
@@ -101,7 +107,7 @@ function Explorer() {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="ghost" className="h-10 text-muted-foreground" disabled={!hasFilters} onClick={() => { setQ(""); setCategory("todas"); setHorizon("todos"); }}>
+          <Button variant="ghost" className="h-10 text-muted-foreground" disabled={!hasFilters} onClick={() => { setQ(""); navigate({ search: (prev) => ({ ...prev, categoria: undefined, horizonte: undefined }), replace: true, resetScroll: false }); }}>
             <X /> Limpiar
           </Button>
         </div>

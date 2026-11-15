@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, BarChart3, LayoutDashboard, RefreshCw, Telescope } from "lucide-react";
+import { Activity, LayoutDashboard, RefreshCw, Telescope } from "lucide-react";
 
 import { BrandMark, BrandWordmark } from "@/components/radar/brand";
 import {
@@ -22,7 +22,6 @@ import { agentStatusQuery, logsQuery } from "@/services/queries";
 const NAV = [
   { title: "Dashboard", to: "/", icon: LayoutDashboard },
   { title: "Explorador de Tendencias", to: "/tendencias", icon: Telescope },
-  { title: "Análisis", to: "/analisis", icon: BarChart3 },
   { title: "Actualizaciones", to: "/actualizaciones", icon: RefreshCw },
 ] as const;
 

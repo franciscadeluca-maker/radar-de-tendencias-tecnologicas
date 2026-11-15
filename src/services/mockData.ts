@@ -1,4 +1,4 @@
-import { CATEGORIES, type AgentExecutionLog, type AgentStatus, type TimelinePoint, type Trend } from "./types";
+import { type AgentExecutionLog, type AgentStatus, type Trend } from "./types";
 
 /** Datos ficticios de ejemplo, usados mientras no haya webhooks de n8n configurados. */
 
@@ -139,29 +139,6 @@ export const MOCK_TRENDS: Trend[] = [
     keywords: ["HVDC", "interconexión", "transmisión"],
   },
 ];
-
-const MONTHS = ["2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11"];
-
-const BASE: Record<(typeof CATEGORIES)[number], [number, number]> = {
-  "Almacenamiento Energético": [210, 1.06],
-  "Redes Inteligentes": [180, 1.055],
-  "Hidrógeno Verde": [150, 1.03],
-  "IA y Automatización": [120, 1.09],
-  "Energía Solar": [190, 1.025],
-  "Movilidad Eléctrica": [160, 1.035],
-  Regulación: [90, 1.02],
-};
-
-export const MOCK_TIMELINE: TimelinePoint[] = MONTHS.map((month, i) => ({
-  month,
-  values: Object.fromEntries(
-    CATEGORIES.map((c, ci) => {
-      const [start, growth] = BASE[c];
-      const noise = 1 + Math.sin((i + 1) * (ci + 2) * 0.9) * 0.07;
-      return [c, Math.round(start * Math.pow(growth, i) * noise)];
-    }),
-  ) as TimelinePoint["values"],
-}));
 
 export const MOCK_LOGS: AgentExecutionLog[] = [
   { id: "ex-0128", startedAt: "2026-11-14T06:00:00Z", status: "Completado", sourcesScanned: 46, newTrends: 1, durationSeconds: 842, trigger: "Programada", model: "Gemini 2.5 Pro" },

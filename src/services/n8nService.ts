@@ -1,11 +1,9 @@
 import { MOCK_AGENT_STATUS, MOCK_DISCOVERABLE } from "./mockData";
 import {
-  CATEGORIES,
   type AgentExecutionLog,
   type AgentStatus,
   type SearchResult,
   type TimeHorizon,
-  type TimelinePoint,
   type Trend,
   type TrendCategory,
 } from "./types";
@@ -100,9 +98,10 @@ let cache: Trend[] | null = null;
 
 async function loadSheet(): Promise<Trend[]> {
   if (cache) return cache;
+  let result: Trend[];
   const res = await fetch(`${SHEET_CSV_URL}&t=${Date.now()}`);
   const rows = parseCSV(await res.text());
-  cache = rows
+  result = rows
     .filter((r) => r["tendencia"] || r["titulo"])
     .map((r, i) => {
       const rawUrl = r["fuente_url"] || "";
@@ -119,11 +118,11 @@ async function loadSheet(): Promise<Trend[]> {
         r["cita_apa"] && `Cita: ${r["cita_apa"]}`,
       ].filter(Boolean) as string[];
 
-      return {
+      const trend: Trend = {
         id: `sheet-${i + 1}`,
         title: r["tendencia"] || r["titulo"] || `Tendencia #${i + 1}`,
         summary: r["descripcion"] || "Sin descripción disponible.",
-        insights: insights.length ? insights : undefined,
+        ...(insights.length ? { insights } : {}),
         category: toCategory(r["categoria"] || ""),
         timeHorizon: toHorizon(r["horizonte"] || ""),
         relevanceScore: toScore(r["confianza"] || "80"),
@@ -131,9 +130,11 @@ async function loadSheet(): Promise<Trend[]> {
         sourceName,
         sourceUrl,
       };
+      return trend;
     })
     .sort((a, b) => b.detectedAt.localeCompare(a.detectedAt));
-  return cache;
+  cache = result;
+  return result;
 }
 
 export const getTrends = () => loadSheet();
@@ -154,27 +155,12 @@ export async function getExecutionLogs(): Promise<AgentExecutionLog[]> {
   }));
 }
 
-export async function getTimeline(): Promise<TimelinePoint[]> {
-  const trends = await loadSheet();
-  const map = new Map<string, Record<TrendCategory, number>>();
-  trends.forEach((t) => {
-    const m = t.detectedAt.slice(0, 7);
-    if (!map.has(m)) {
-      const base = {} as Record<TrendCategory, number>;
-      CATEGORIES.forEach((c) => (base[c] = 0));
-      map.set(m, base);
-    }
-    map.get(m)![t.category]++;
-  });
-  return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([month, values]) => ({ month, values }));
-}
-
 export async function getAgentStatus(): Promise<AgentStatus> {
   return { ...MOCK_AGENT_STATUS, state: "Activo", schedule: "Todos los días · 14:00" };
 }
 
 let idx = 0;
-export async function triggerSearch(): Promise<SearchResult> {
+export async function triggerSearch(_query?: string): Promise<SearchResult> {
   const startedAt = new Date();
   await new Promise((r) => setTimeout(r, 2000));
   const seed = MOCK_DISCOVERABLE[idx++ % MOCK_DISCOVERABLE.length]!;

@@ -1,4 +1,4 @@
-import { CATEGORIES, type AgentExecutionLog, type AgentStatus, type Trend } from "./types";
+import { type AgentExecutionLog, type AgentStatus, type Trend } from "./types";
 
 /** Datos ficticios de ejemplo, usados mientras no haya webhooks de n8n configurados. */
 

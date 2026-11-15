@@ -1,6 +1,5 @@
 import { MOCK_AGENT_STATUS, MOCK_DISCOVERABLE } from "./mockData";
 import {
-  CATEGORIES,
   type AgentExecutionLog,
   type AgentStatus,
   type SearchResult,

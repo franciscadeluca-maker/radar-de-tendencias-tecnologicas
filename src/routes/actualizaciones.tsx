@@ -56,7 +56,7 @@ function Updates() {
             <div className="relative hidden size-28 shrink-0 sm:block">
               <div className="absolute inset-2 rounded-full bg-sky-soft" />
               {busy && <div className="absolute inset-0 rounded-full border-2 border-dashed border-sky animate-radar" />}
-              <img src="/mascota-energvision.png" alt="Mascota del agente EnergVision" className="relative size-28 object-contain" />
+              <img src="/mascota-energvision.png.png" alt="Mascota del agente EnergVision" className="relative size-28 object-contain" />
             </div>
             <div className="min-w-0 space-y-3">
               <div className="flex flex-wrap items-center gap-2">

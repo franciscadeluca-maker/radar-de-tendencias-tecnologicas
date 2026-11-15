@@ -5,7 +5,6 @@ import {
   type AgentStatus,
   type SearchResult,
   type TimeHorizon,
-  type TimelinePoint,
   type Trend,
   type TrendCategory,
 } from "./types";
@@ -155,21 +154,6 @@ export async function getExecutionLogs(): Promise<AgentExecutionLog[]> {
     trigger: "Programada",
     model: "Gemini 2.5 Pro",
   }));
-}
-
-export async function getTimeline(): Promise<TimelinePoint[]> {
-  const trends = await loadSheet();
-  const map = new Map<string, Record<TrendCategory, number>>();
-  trends.forEach((t) => {
-    const m = t.detectedAt.slice(0, 7);
-    if (!map.has(m)) {
-      const base = {} as Record<TrendCategory, number>;
-      CATEGORIES.forEach((c) => (base[c] = 0));
-      map.set(m, base);
-    }
-    map.get(m)![t.category]++;
-  });
-  return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([month, values]) => ({ month, values }));
 }
 
 export async function getAgentStatus(): Promise<AgentStatus> {

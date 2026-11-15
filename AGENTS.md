@@ -35,3 +35,4 @@ use the editor.
 - Pages read data via TanStack Query options in `src/services/queries.ts`; agent actions update that cache (see `src/hooks/use-agent.ts`) so new trends/logs appear app-wide without a backend.
 - Pure aggregation/filter logic lives in `src/lib/radar/stats.ts` so it can be unit-tested apart from UI.
 - Dates render in Buenos Aires time via `src/lib/radar/format.ts` to avoid server/browser hydration mismatches.
+- Explorer category/horizon filters live in the `/tendencias` URL search (`categoria`, `horizonte`, parsed by `parseExplorerSearch`) so other pages can deep-link pre-filtered views.
